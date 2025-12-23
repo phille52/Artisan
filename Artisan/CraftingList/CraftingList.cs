@@ -432,7 +432,19 @@ namespace Artisan.CraftingLists
                     else if (type == PreCrafting.CraftType.Normal)
                     {
                         CLTM.DelayNext((int)(Math.Min(P.Config.ListCraftThrottle2, 2) * 1000));
-                        CLTM.Enqueue(() => SetIngredients(), "SettingIngredients");
+                        if (config.IngredientConfigs.Count > 0)
+                        {
+                            EnduranceIngredients[] setIngredients = config.IngredientConfigs.Select(x =>
+                                new EnduranceIngredients
+                                {
+                                    NQSet = x.Value.Nq, HQSet = x.Value.Hq
+                                }).ToArray();
+                            CLTM.Enqueue(() => SetIngredients(setIngredients), "SettingIngredients");
+                        }
+                        else
+                        {
+                            CLTM.Enqueue(() => SetIngredients(), "SettingIngredients");
+                        }
                         CLTM.Enqueue(() => Operations.RepeatActualCraft(), "ListCraft");
                         CLTM.Enqueue(() => Crafting.CurState is Crafting.State.InProgress or Crafting.State.QuickCraft, 2000, "ListNormalWaitStart");
                         return;

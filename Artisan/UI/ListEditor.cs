@@ -1316,11 +1316,18 @@ internal class ListEditor : Window, IDisposable
                 P.Config.Save();
             }
         }
+        {
+            if (config.DrawIngredientConfig(recipe))
+            {
+                P.Config.RecipeConfigs[selectedListItem] = config;
+                P.Config.Save();
+            }
+        }
 
         var stats = CharacterStats.GetBaseStatsForClassHeuristic((Job)((uint)Job.CRP + recipe.CraftType.RowId));
         stats.AddConsumables(new(config.RequiredFood, config.RequiredFoodHQ), new(config.RequiredPotion, config.RequiredPotionHQ), CharacterInfo.FCCraftsmanshipbuff);
         var craft = Crafting.BuildCraftStateForRecipe(stats, (Job)((uint)Job.CRP + recipe.CraftType.RowId), recipe);
-        craft.InitialQuality = Simulator.GetStartingQuality(recipe, hqSim, craft.StatLevel);
+        craft.InitialQuality = Simulator.GetStartingQuality(recipe, hqSim, craft.StatLevel, config);
         if (config.DrawSolver(craft, true, false))
         {
             P.Config.RecipeConfigs[selectedListItem] = config;

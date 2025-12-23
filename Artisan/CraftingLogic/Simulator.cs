@@ -114,7 +114,7 @@ public static class Simulator
         hintColor = ImGuiColors.DalamudWhite;
         var solver = CraftingProcessor.GetSolverForRecipe(config, craft).CreateSolver(craft);
         if (solver == null) return "No valid solver found.";
-        var startingQuality = GetStartingQuality(recipe, assumeMaxStartingQuality, craft.StatLevel);
+        var startingQuality = GetStartingQuality(recipe, assumeMaxStartingQuality, craft.StatLevel, config);
         var time = SolverUtils.EstimateCraftTime(solver, craft, startingQuality);
         var result = SolverUtils.SimulateSolverExecution(solver, craft, startingQuality);
         var status = result != null ? Status(craft, result) : CraftStatus.InProgress;
@@ -154,13 +154,16 @@ public static class Simulator
         return solverHint;
     }
 
-    public unsafe static int GetStartingQuality(Recipe recipe, bool assumeMaxStartingQuality, int characterLevel)
+    public unsafe static int GetStartingQuality(Recipe recipe, bool assumeMaxStartingQuality, int characterLevel, RecipeConfig recipeConfig)
     {
         var rd = RecipeNoteRecipeData.Ptr();
         var re = rd != null ? rd->FindRecipeById(recipe.RowId) : null;
         var shqf = (float)recipe.MaterialQualityFactor / 100;
         var lt = recipe.Number == 0 && characterLevel < 100 ? Svc.Data.GetExcelSheet<RecipeLevelTable>().First(x => x.ClassJobLevel == characterLevel) : recipe.RecipeLevelTable.Value;
-        var startingQuality = assumeMaxStartingQuality ? (int)(Calculations.RecipeMaxQuality(recipe, lt) * shqf) : re != null ? Calculations.GetStartingQuality(recipe, re->GetAssignedHQIngredients(), lt) : 0;
+        var startingQuality = assumeMaxStartingQuality ? (int)(Calculations.RecipeMaxQuality(recipe, lt) * shqf)
+            : recipeConfig.IngredientConfigs.Count> 0 ? 
+                Calculations.GetStartingQuality(recipe, recipeConfig.IngredientConfigs.Select(x => x.Value.Hq).ToArray(), lt)
+                : 0;
         return startingQuality;
     }
 

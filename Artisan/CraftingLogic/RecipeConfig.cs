@@ -1,4 +1,6 @@
-﻿using Artisan.Autocraft;
+﻿using System;
+using System.Collections.Generic;
+using Artisan.Autocraft;
 using Artisan.CraftingLogic.Solvers;
 using Artisan.GameInterop;
 using Artisan.RawInformation;
@@ -38,6 +40,7 @@ public class RecipeConfig
     public uint requiredSquadronManual = Default;
     public bool requiredFoodHQ = true;
     public bool requiredPotionHQ = true;
+    public Dictionary<uint, IngredientConfig> IngredientConfigs = new();
 
 
     public bool FoodEnabled => RequiredFood != Disabled;
@@ -70,12 +73,13 @@ public class RecipeConfig
         stats.AddConsumables(new(config.RequiredFood, config.RequiredFoodHQ), new(config.RequiredPotion, config.RequiredPotionHQ), CharacterInfo.FCCraftsmanshipbuff);
         var craft = Crafting.BuildCraftStateForRecipe(stats, (Job)((uint)Job.CRP + recipe.CraftType.RowId), recipe);
         if (craft.InitialQuality == 0)
-            craft.InitialQuality = Simulator.GetStartingQuality(recipe, false, craft.StatLevel);
+            craft.InitialQuality = Simulator.GetStartingQuality(recipe, false, craft.StatLevel, this);
         bool changed = false;
         changed |= DrawFood();
         changed |= DrawPotion();
         changed |= DrawManual();
         changed |= DrawSquadronManual();
+        changed |= DrawIngredientConfig(recipe);
         changed |= DrawSolver(craft, liveStats: Player.ClassJob.RowId == craft.Recipe.CraftType.RowId + 8);
         DrawSimulator(craft);
         return changed;
@@ -289,6 +293,86 @@ public class RecipeConfig
         return changed;
     }
 
+    public bool DrawIngredientConfig(Recipe recipe, bool hasButton = false)
+    {
+        bool changed = false;
+        
+        ImGuiEx.TextV("Ingredient Quality:");
+        ImGui.SameLine(130f.Scale());
+        if (ImGui.BeginTable("IngredientConfigTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.NoHostExtendX))
+        {
+            ImGui.TableSetupColumn("Material", ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("NQ", ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed);
+            ImGui.TableHeadersRow();
+
+            foreach (var i in recipe.Ingredients().Where(x => x.Amount > 0))
+            {
+                if (IngredientConfigs.TryGetValue(i.Item.RowId, out var ingredientConfig))
+                {
+                    ImGui.TableNextRow();
+                    var item = LuminaSheets.ItemSheet[i.Item.RowId];
+                    ImGui.TableNextColumn();
+                    ImGui.Text($"{item.Name}");
+                    ImGui.TableNextColumn();
+                    if (item.CanBeHq)
+                    {
+                        ImGui.SetNextItemWidth(80f.Scale());
+                        if (ImGui.InputInt($"###InputNQ{item.RowId}", ref ingredientConfig.Nq, step: 1))
+                        {
+                            if (ingredientConfig.Nq < 0)
+                                ingredientConfig.Nq = 0;
+
+                            if (ingredientConfig.Nq > i.Amount)
+                                ingredientConfig.Nq = i.Amount;
+
+                            ingredientConfig.Hq = i.Amount - ingredientConfig.Nq;
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        ImGui.Text($"{ingredientConfig.Nq}");
+                    }
+                    ImGui.TableNextColumn();
+                    if (item.CanBeHq)
+                    {
+                        ImGui.SetNextItemWidth(80f.Scale());
+                        if (ImGui.InputInt($"###InputHQ{item.RowId}", ref ingredientConfig.Hq, step: 1))
+                        {
+                            if (ingredientConfig.Hq < 0)
+                                ingredientConfig.Hq = 0;
+
+                            if (ingredientConfig.Hq > i.Amount)
+                                ingredientConfig.Hq = i.Amount;
+
+                            ingredientConfig.Nq = Math.Min(i.Amount - ingredientConfig.Hq, i.Amount);
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        ImGui.Text($"{ingredientConfig.Hq}");
+                    }
+                }
+                else
+                {
+                    IngredientConfigs.Add(i.Item.RowId, new IngredientConfig
+                    {
+                        Nq = i.Amount, Hq = 0
+                    });
+                    changed = true;
+                }
+            }
+            
+            ImGui.EndTable();
+            
+        }
+        
+        return changed;
+    }
+    
+
     public unsafe void DrawSimulator(CraftState craft)
     {
         if (!P.Config.HideRecipeWindowSimulator)
@@ -358,4 +442,11 @@ public class RecipeConfig
 
         }
     }
+    
+    public class IngredientConfig
+    {
+        public int Nq;
+        public int Hq;
+    }
+    
 }
