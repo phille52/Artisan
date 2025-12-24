@@ -48,6 +48,7 @@ public class RecipeConfig
     public bool ManualEnabled => RequiredManual != Disabled;
     public bool SquadronManualEnabled => RequiredSquadronManual != Disabled;
 
+    public bool IngredientQualityOverrideEnabled = false;
 
     public uint RequiredFood => requiredFood == Default ? P.Config.DefaultConsumables.requiredFood : requiredFood;
     public uint RequiredPotion => requiredPotion == Default ? P.Config.DefaultConsumables.requiredPotion : requiredPotion;
@@ -297,76 +298,83 @@ public class RecipeConfig
     {
         bool changed = false;
         
-        ImGuiEx.TextV("Ingredient Quality:");
-        ImGui.SameLine(130f.Scale());
-        if (ImGui.BeginTable("IngredientConfigTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.NoHostExtendX))
+        ImGuiEx.TextV($"Ingredient quality override:");
+        ImGui.SameLine();
+        ImGuiEx.Checkbox("", ref IngredientQualityOverrideEnabled);
+
+        if (IngredientQualityOverrideEnabled)
         {
-            ImGui.TableSetupColumn("Material", ImGuiTableColumnFlags.WidthFixed);
-            ImGui.TableSetupColumn("NQ", ImGuiTableColumnFlags.WidthFixed);
-            ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed);
-            ImGui.TableHeadersRow();
-
-            foreach (var i in recipe.Ingredients().Where(x => x.Amount > 0))
+            
+            ImGui.SetCursorPosX(130f.Scale());
+            if (ImGui.BeginTable("IngredientConfigTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.NoHostExtendX))
             {
-                if (IngredientConfigs.TryGetValue(i.Item.RowId, out var ingredientConfig))
+                ImGui.TableSetupColumn("Material", ImGuiTableColumnFlags.WidthFixed);
+                ImGui.TableSetupColumn("NQ", ImGuiTableColumnFlags.WidthFixed);
+                ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed);
+                ImGui.TableHeadersRow();
+
+                foreach (var i in recipe.Ingredients().Where(x => x.Amount > 0))
                 {
-                    ImGui.TableNextRow();
-                    var item = LuminaSheets.ItemSheet[i.Item.RowId];
-                    ImGui.TableNextColumn();
-                    ImGui.Text($"{item.Name}");
-                    ImGui.TableNextColumn();
-                    if (item.CanBeHq)
+                    if (IngredientConfigs.TryGetValue(i.Item.RowId, out var ingredientConfig))
                     {
-                        ImGui.SetNextItemWidth(80f.Scale());
-                        if (ImGui.InputInt($"###InputNQ{item.RowId}", ref ingredientConfig.Nq, step: 1))
+                        ImGui.TableNextRow();
+                        var item = LuminaSheets.ItemSheet[i.Item.RowId];
+                        ImGui.TableNextColumn();
+                        ImGui.Text($"{item.Name}");
+                        ImGui.TableNextColumn();
+                        if (item.CanBeHq)
                         {
-                            if (ingredientConfig.Nq < 0)
-                                ingredientConfig.Nq = 0;
+                            ImGui.SetNextItemWidth(80f.Scale());
+                            if (ImGui.InputInt($"###InputNQ{item.RowId}", ref ingredientConfig.Nq, step: 1))
+                            {
+                                if (ingredientConfig.Nq < 0)
+                                    ingredientConfig.Nq = 0;
 
-                            if (ingredientConfig.Nq > i.Amount)
-                                ingredientConfig.Nq = i.Amount;
+                                if (ingredientConfig.Nq > i.Amount)
+                                    ingredientConfig.Nq = i.Amount;
 
-                            ingredientConfig.Hq = i.Amount - ingredientConfig.Nq;
-                            changed = true;
+                                ingredientConfig.Hq = i.Amount - ingredientConfig.Nq;
+                                changed = true;
+                            }
+                        }
+                        else
+                        {
+                            ImGui.Text($"{ingredientConfig.Nq}");
+                        }
+                        ImGui.TableNextColumn();
+                        if (item.CanBeHq)
+                        {
+                            ImGui.SetNextItemWidth(80f.Scale());
+                            if (ImGui.InputInt($"###InputHQ{item.RowId}", ref ingredientConfig.Hq, step: 1))
+                            {
+                                if (ingredientConfig.Hq < 0)
+                                    ingredientConfig.Hq = 0;
+
+                                if (ingredientConfig.Hq > i.Amount)
+                                    ingredientConfig.Hq = i.Amount;
+
+                                ingredientConfig.Nq = Math.Min(i.Amount - ingredientConfig.Hq, i.Amount);
+                                changed = true;
+                            }
+                        }
+                        else
+                        {
+                            ImGui.Text($"{ingredientConfig.Hq}");
                         }
                     }
                     else
                     {
-                        ImGui.Text($"{ingredientConfig.Nq}");
-                    }
-                    ImGui.TableNextColumn();
-                    if (item.CanBeHq)
-                    {
-                        ImGui.SetNextItemWidth(80f.Scale());
-                        if (ImGui.InputInt($"###InputHQ{item.RowId}", ref ingredientConfig.Hq, step: 1))
+                        IngredientConfigs.Add(i.Item.RowId, new IngredientConfig
                         {
-                            if (ingredientConfig.Hq < 0)
-                                ingredientConfig.Hq = 0;
-
-                            if (ingredientConfig.Hq > i.Amount)
-                                ingredientConfig.Hq = i.Amount;
-
-                            ingredientConfig.Nq = Math.Min(i.Amount - ingredientConfig.Hq, i.Amount);
-                            changed = true;
-                        }
-                    }
-                    else
-                    {
-                        ImGui.Text($"{ingredientConfig.Hq}");
+                            Nq = i.Amount, Hq = 0
+                        });
+                        changed = true;
                     }
                 }
-                else
-                {
-                    IngredientConfigs.Add(i.Item.RowId, new IngredientConfig
-                    {
-                        Nq = i.Amount, Hq = 0
-                    });
-                    changed = true;
-                }
+                
+                ImGui.EndTable();
+                
             }
-            
-            ImGui.EndTable();
-            
         }
         
         return changed;
