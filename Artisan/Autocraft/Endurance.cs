@@ -392,7 +392,18 @@ namespace Artisan.Autocraft
                             if (P.Config.MaxQuantityMode)
                                 P.TM.Enqueue(() => CraftingListFunctions.SetIngredients(), "EnduranceSetIngredientsNonLayout");
                             else
+                            {
+                                if (config.IngredientConfigs.Count > 0)
+                                {
+                                    EnduranceIngredients[] setIngredients = config.IngredientConfigs.Select(x =>
+                                        new EnduranceIngredients
+                                        {
+                                            NQSet = x.Value.Nq, HQSet = x.Value.Hq
+                                        }).ToArray();
+                                    SetIngredients = setIngredients;
+                                }
                                 P.TM.Enqueue(() => CraftingListFunctions.SetIngredients(SetIngredients), "EnduranceSetIngredientsLayout");
+                            }
 
                             P.TM.Enqueue(() => Operations.RepeatActualCraft(), 500, "EnduranceNormalStart");
                             P.TM.Enqueue(() => Crafting.CurState is Crafting.State.WaitStart, 500, "EnduranceNormalWaitStart");
